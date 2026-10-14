@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FRS Archiv - Sendungsarchiv</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: system-ui, -apple-system, sans-serif; background: #f5f5f5; }
+        header { background: #2c3e50; color: white; padding: 1rem 2rem; }
+        header h1 { font-size: 1.5rem; }
+        nav { background: #34495e; padding: 0.5rem 2rem; }
+        nav a { color: #ecf0f1; text-decoration: none; margin-right: 1.5rem; }
+        nav a:hover { color: #3498db; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+        .search-box { display: flex; gap: 1rem; margin-bottom: 2rem; }
+        .search-box input { flex: 1; padding: 0.75rem; font-size: 1rem; border: 1px solid #ddd; border-radius: 4px; }
+        .search-box button { padding: 0.75rem 2rem; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .filters { display: flex; gap: 1rem; margin-bottom: 1rem; }
+        .filters select { padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; }
+        .stats { display: flex; gap: 2rem; margin-bottom: 2rem; }
+        .stat { background: white; padding: 1rem 2rem; border-radius: 8px; text-align: center; }
+        .stat .number { font-size: 2rem; font-weight: bold; color: #3498db; }
+        .stat .label { color: #7f8c8d; font-size: 0.9rem; }
+        .video-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
+        .video-card { background: white; border-radius: 8px; padding: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .video-card h3 { font-size: 1rem; margin-bottom: 0.5rem; color: #2c3e50; }
+        .video-card .meta { color: #7f8c8d; font-size: 0.85rem; margin-bottom: 0.5rem; }
+        .video-card .tags { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+        .tag { background: #e8f4f8; color: #3498db; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; }
+        .search-results { margin-top: 2rem; }
+        .result { background: white; padding: 1rem; margin-bottom: 1rem; border-radius: 8px; }
+        .result mark { background: #fff3cd; padding: 0 2px; }
+        .loading { text-align: center; padding: 2rem; color: #7f8c8d; }
+        .home-link { color: #ecf0f1; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>📻 FRS Sendungsarchiv</h1>
+        <a href="/" class="home-link">← Zurück zur Plattform</a>
+    </header>
+    <nav>
+        <a href="#" onclick="showSection('browse')">Archiv durchsuchen</a>
+        <a href="#" onclick="showSection('search')">Volltextsuche</a>
+        <a href="#" onclick="showSection('stats')">Statistiken</a>
+    </nav>
+    
+    <div class="container">
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="Suche in Transkripten... (z.B. Projektmanagement, Risiko, Stakeholder)" onkeypress="if(event.key==='Enter') doSearch()">
+            <button onclick="doSearch()">🔍 Suchen</button>
+        </div>
+        
+        <div class="stats" id="stats">
+            <div class="stat"><div class="number" id="stat-videos">-</div><div class="label">Videos</div></div>
+            <div class="stat"><div class="number" id="stat-words">-</div><div class="label">Wörter</div></div>
+            <div class="stat"><div class="number" id="stat-lecturers">-</div><div class="label">Dozenten</div></div>
+            <div class="stat"><div class="number" id="stat-themes">-</div><div class="label">Themen</div></div>
+        </div>
+        
+        <div class="filters">
+            <select id="filterLecturer" onchange="loadVideos()">
+                <option value="">Alle Dozenten</option>
+            </select>
+            <select id="filterTheme" onchange="loadVideos()">
+                <option value="">Alle Themen</option>
+            </select>
+        </div>
+        
+        <div id="content">
+            <div class="video-grid" id="videoGrid"></div>
+        </div>
+        
+        <div id="searchResults" class="search-results" style="display:none;"></div>
+    </div>
+
+    <script>
+        const API = '/api/frs';
+        
+        async function loadStats() {
+            const res = await fetch(API + '/stats');
+            const stats = await res.json();
+            document.getElementById('stat-videos').textContent = stats.total_videos;
+            document.getElementById('stat-words').textContent = (stats.total_words / 1000).toFixed(0) + 'k';
+            document.getElementById('stat-lecturers').textContent = stats.lecturers;
+            document.getElementById('stat-themes').textContent = stats.themes;
+        }
+        
+        async function loadFilters() {
+            const [lecturers, themes] = await Promise.all([
+                fetch(API + '/lecturers').then(r => r.json()),
+                fetch(API + '/themes').then(r => r.json())
+            ]);
+            
+            const lecSel = document.getElementById('filterLecturer');
+            lecturers.forEach(l => {
+                lecSel.innerHTML += `<option value="${l.lecturer}">${l.lecturer} (${l.count})</option>`;
+            });
+            
+            const themeSel = document.getElementById('filterTheme');
+            themes.forEach(t => {
+                themeSel.innerHTML += `<option value="${t.theme}">${t.theme} (${t.count})</option>`;
+            });
+        }
+        
+        async function loadVideos() {
+            const lecturer = document.getElementById('filterLecturer').value;
+            const theme = document.getElementById('filterTheme').value;
+            
+            let url = API + '/videos?';
+            if (lecturer) url += 'lecturer=' + encodeURIComponent(lecturer) + '&';
+            if (theme) url += 'theme=' + encodeURIComponent(theme) + '&';
+            
+            const res = await fetch(url);
+            const videos = await res.json();
+            
+            const grid = document.getElementById('videoGrid');
+            grid.innerHTML = videos.map(v => `
+                <div class="video-card">
+                    <h3>${v.filename || 'Unbekannt'}</h3>
+                    <div class="meta">📅 ${v.date || 'N/A'} · 👤 ${v.lecturer || 'N/A'}</div>
+                    <div class="tags">
+                        <span class="tag">${v.theme || 'Sonstiges'}</span>
+                        ${v.transcript_words ? `<span class="tag">📝 ${v.transcript_words} Wörter</span>` : ''}
+                    </div>
+                </div>
+            `).join('') || '<p>Keine Videos gefunden.</p>';
+        }
+        
+        async function doSearch() {
+            const query = document.getElementById('searchInput').value;
+            if (query.length < 2) return;
+            
+            document.getElementById('content').style.display = 'none';
+            document.getElementById('searchResults').style.display = 'block';
+            document.getElementById('searchResults').innerHTML = '<div class="loading">Suche läuft...</div>';
+            
+            const res = await fetch(API + '/search?q=' + encodeURIComponent(query));
+            const data = await res.json();
+            
+            const container = document.getElementById('searchResults');
+            if (data.results.length === 0) {
+                container.innerHTML = '<p>Keine Ergebnisse gefunden.</p>';
+                return;
+            }
+            
+            container.innerHTML = `<h2>${data.count} Ergebnisse für "${data.query}"</h2>` + data.results.map(r => `
+                <div class="result">
+                    <h3>${r.filename || 'Unbekannt'}</h3>
+                    <div class="meta">👤 ${r.lecturer || 'N/A'} · 📚 ${r.theme || 'N/A'}</div>
+                    <p>${r.snippet}</p>
+                </div>
+            `).join('');
+        }
+        
+        function showSection(section) {
+            document.getElementById('content').style.display = 'block';
+            document.getElementById('searchResults').style.display = 'none';
+            if (section === 'browse') loadVideos();
+        }
+        
+        // Init
+        loadStats();
+        loadFilters();
+        loadVideos();
+    </script>
+</body>
+</html>

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - FRS Kiosk Platform</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: system-ui, sans-serif; background: #f5f5f5; }
+        header { background: #2c3e50; color: white; padding: 1rem 2rem; display: flex; justify-content: space-between; }
+        nav { background: #34495e; padding: 0.5rem 2rem; }
+        nav a { color: #ecf0f1; text-decoration: none; margin-right: 1.5rem; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem; }
+        .card { background: white; border-radius: 8px; padding: 1.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { color: #2c3e50; margin-bottom: 1rem; font-size: 1.1rem; }
+        .stat-big { font-size: 3rem; font-weight: bold; color: #3498db; }
+        .stat-label { color: #7f8c8d; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #f8f9fa; font-weight: 600; }
+        .progress-bar { background: #eee; border-radius: 4px; height: 8px; margin-top: 0.5rem; }
+        .progress-fill { background: #2ecc71; height: 100%; border-radius: 4px; }
+        .btn { display: inline-block; padding: 0.5rem 1rem; background: #3498db; color: white; text-decoration: none; border-radius: 4px; margin-right: 0.5rem; }
+        .btn:hover { background: #2980b9; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>📊 Dashboard</h1>
+        <a href="/" style="color: white;">← Zurück</a>
+    </header>
+    <nav>
+        <a href="/frs">📻 FRS Archiv</a>
+        <a href="/kiosk">🎓 Kiosk</a>
+        <a href="/dashboard">📊 Dashboard</a>
+    </nav>
+    
+    <div class="container">
+        <div class="grid">
+            <div class="card">
+                <h2>🎯 Lernübersicht</h2>
+                <div class="stat-big" id="totalCards">-</div>
+                <div class="stat-label">Lernkarten gesamt</div>
+                <div style="margin-top: 1rem;">
+                    <div class="stat-big" style="font-size: 2rem; color: #2ecc71;" id="masteredCards">-</div>
+                    <div class="stat-label">Gemeistert (<span id="masteryPct">0</span>%)</div>
+                    <div class="progress-bar"><div class="progress-fill" id="masteryBar" style="width: 0%"></div></div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>📈 Fortschritt (7 Tage)</h2>
+                <canvas id="progressChart" height="200"></canvas>
+            </div>
+            
+            <div class="card">
+                <h2>📚 Themen-Statistik</h2>
+                <canvas id="themeChart" height="200"></canvas>
+            </div>
+            
+            <div class="card">
+                <h2>👨‍🏫 Dozenten-Vergleich</h2>
+                <table id="lecturerTable">
+                    <thead>
+                        <tr><th>Dozent</th><th>Videos</th><th>Themen</th><th>Karten</th></tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            
+            <div class="card">
+                <h2>📤 Export</h2>
+                <p>Exportiere Lernkarten für externe Tools:</p>
+                <a href="/api/export/cards?format=csv" class="btn">📄 CSV herunterladen</a>
+                <a href="/api/export/cards?format=json" class="btn">📋 JSON anzeigen</a>
+            </div>
+            
+            <div class="card">
+                <h2>🔗 Schnellzugriff</h2>
+                <a href="/frs" class="btn">📻 Archiv durchsuchen</a>
+                <a href="/kiosk" class="btn">🎓 Kiosk starten</a>
+                <a href="/docs" class="btn">📖 API Docs</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function loadDashboard() {
+            // Kiosk Stats
+            const kioskStats = await fetch('/api/kiosk/stats').then(r => r.json());
+            document.getElementById('totalCards').textContent = kioskStats.total_cards;
+            document.getElementById('masteredCards').textContent = kioskStats.mastered;
+            document.getElementById('masteryPct').textContent = kioskStats.mastery_percent;
+            document.getElementById('masteryBar').style.width = kioskStats.mastery_percent + '%';
+            
+            // Dashboard Daten
+            const dash = await fetch('/api/dashboard').then(r => r.json());
+            
+            // Fortschritts-Chart
+            if (dash.progress_over_time.length > 0) {
+                new Chart(document.getElementById('progressChart'), {
+                    type: 'line',
+                    data: {
+                        labels: dash.progress_over_time.map(d => d.date),
+                        datasets: [{
+                            label: 'Gemeistert',
+                            data: dash.progress_over_time.map(d => d.mastered),
+                            borderColor: '#2ecc71',
+                            fill: true
+                        }]
+                    }
+                });
+            }
+            
+            // Themen-Chart
+            new Chart(document.getElementById('themeChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: dash.theme_stats.map(t => t.theme),
+                    datasets: [{
+                        data: dash.theme_stats.map(t => t.card_count),
+                        backgroundColor: ['#3498db', '#2ecc71', '#e74c3c', '#f39c12', '#9b59b6', '#1abc9c']
+                    }]
+                }
+            });
+            
+            // Dozenten-Tabelle
+            const lecturers = await fetch('/api/lecturers/compare').then(r => r.json());
+            const tbody = document.querySelector('#lecturerTable tbody');
+            tbody.innerHTML = lecturers.slice(0, 8).map(l => `
+                <tr>
+                    <td><strong>${l.lecturer}</strong></td>
+                    <td>${l.video_count}</td>
+                    <td>${l.theme_count}</td>
+                    <td>${l.card_count || 0}</td>
+                </tr>
+            `).join('');
+        }
+        
+        loadDashboard();
+    </script>
+</body>
+</html>

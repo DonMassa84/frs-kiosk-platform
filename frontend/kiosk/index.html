@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IHK Lern-Kiosk</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: system-ui, -apple-system, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+        header { background: rgba(0,0,0,0.2); color: white; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+        header h1 { font-size: 1.5rem; }
+        .home-link { color: white; text-decoration: none; opacity: 0.8; }
+        .container { max-width: 800px; margin: 0 auto; padding: 2rem; }
+        
+        .progress-bar { background: rgba(255,255,255,0.2); border-radius: 10px; height: 20px; margin-bottom: 2rem; overflow: hidden; }
+        .progress-fill { background: #2ecc71; height: 100%; transition: width 0.3s; }
+        .progress-text { color: white; text-align: center; margin-top: -25px; line-height: 20px; font-size: 0.85rem; }
+        
+        .stats-row { display: flex; gap: 1rem; margin-bottom: 2rem; }
+        .stat { flex: 1; background: rgba(255,255,255,0.15); border-radius: 8px; padding: 1rem; text-align: center; color: white; }
+        .stat .number { font-size: 1.5rem; font-weight: bold; }
+        .stat.new { background: rgba(52, 152, 219, 0.3); }
+        .stat.learning { background: rgba(241, 196, 15, 0.3); }
+        .stat.mastered { background: rgba(46, 204, 113, 0.3); }
+        .stat.review { background: rgba(231, 76, 60, 0.3); }
+        
+        .card { background: white; border-radius: 16px; padding: 2rem; box-shadow: 0 10px 40px rgba(0,0,0,0.2); min-height: 300px; display: flex; flex-direction: column; }
+        .card .question { font-size: 1.25rem; color: #2c3e50; margin-bottom: 1rem; flex: 1; }
+        .card .answer { font-size: 1.1rem; color: #27ae60; margin-top: 1rem; padding: 1rem; background: #f0fff4; border-radius: 8px; display: none; }
+        .card .meta { color: #7f8c8d; font-size: 0.85rem; margin-bottom: 1rem; }
+        .card .tags { margin-bottom: 1rem; }
+        .tag { display: inline-block; background: #e8f4f8; color: #3498db; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.8rem; margin-right: 0.5rem; }
+        
+        .buttons { display: flex; gap: 1rem; margin-top: 1rem; }
+        .btn { flex: 1; padding: 1rem; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; transition: transform 0.1s; }
+        .btn:hover { transform: scale(1.02); }
+        .btn-show { background: #3498db; color: white; }
+        .btn-correct { background: #2ecc71; color: white; }
+        .btn-wrong { background: #e74c3c; color: white; }
+        .btn-skip { background: #95a5a6; color: white; }
+        
+        .filter-tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+        .tab { padding: 0.5rem 1rem; background: rgba(255,255,255,0.2); color: white; border: none; border-radius: 20px; cursor: pointer; }
+        .tab.active { background: white; color: #667eea; }
+        
+        .quiz-mode .card .answer { display: block; }
+        .quiz-mode .buttons { display: none; }
+        
+        .empty { text-align: center; color: white; padding: 4rem; }
+        .empty h2 { margin-bottom: 1rem; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🎓 IHK Lern-Kiosk</h1>
+        <a href="/" class="home-link">← Zurück</a>
+    </header>
+    
+    <div class="container">
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+            <div class="progress-text" id="progressText">0% gemeistert</div>
+        </div>
+        
+        <div class="stats-row">
+            <div class="stat new"><div class="number" id="stat-new">-</div><div>Neu</div></div>
+            <div class="stat learning"><div class="number" id="stat-learning">-</div><div>Lernen</div></div>
+            <div class="stat mastered"><div class="number" id="stat-mastered">-</div><div>Gemeistert</div></div>
+            <div class="stat review"><div class="number" id="stat-review">-</div><div>Wiederholen</div></div>
+        </div>
+        
+        <div class="filter-tabs">
+            <button class="tab active" onclick="setFilter(null)">Alle</button>
+            <button class="tab" onclick="setFilter('new')">Neu</button>
+            <button class="tab" onclick="setFilter('learning')">Lernen</button>
+            <button class="tab" onclick="setFilter('review')">Wiederholen</button>
+            <button class="tab" onclick="startQuiz()">🎯 Quiz</button>
+        </div>
+        
+        <div id="cardContainer">
+            <div class="card">
+                <div class="question" id="cardQuestion">Lade Karten...</div>
+                <div class="meta" id="cardMeta"></div>
+                <div class="tags" id="cardTags"></div>
+                <div class="answer" id="cardAnswer"></div>
+                <div class="buttons">
+                    <button class="btn btn-show" onclick="showAnswer()">Antwort zeigen</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="buttons" id="actionButtons" style="margin-top: 1rem; display: none;">
+            <button class="btn btn-correct" onclick="markCard(true)">✓ Richtig</button>
+            <button class="btn btn-wrong" onclick="markCard(false)">✗ Falsch</button>
+            <button class="btn btn-skip" onclick="nextCard()">Überspringen</button>
+        </div>
+    </div>
+
+    <script>
+        const API = '/api/kiosk';
+        let cards = [];
+        let currentIndex = 0;
+        let currentFilter = null;
+        let quizMode = false;
+        let answerShown = false;
+        
+        async function loadStats() {
+            const res = await fetch(API + '/stats');
+            const stats = await res.json();
+            
+            document.getElementById('stat-new').textContent = stats.new;
+            document.getElementById('stat-learning').textContent = stats.learning;
+            document.getElementById('stat-mastered').textContent = stats.mastered;
+            document.getElementById('stat-review').textContent = stats.review;
+            
+            const pct = stats.mastery_percent;
+            document.getElementById('progressFill').style.width = pct + '%';
+            document.getElementById('progressText').textContent = pct + '% gemeistert (' + stats.total_cards + ' Karten)';
+        }
+        
+        async function loadCards() {
+            let url = API + '/cards?limit=50';
+            if (currentFilter) url += '&status=' + currentFilter;
+            
+            const res = await fetch(url);
+            cards = await res.json();
+            currentIndex = 0;
+            
+            if (cards.length === 0) {
+                document.getElementById('cardContainer').innerHTML = `
+                    <div class="empty">
+                        <h2>🎉 Keine Karten in dieser Kategorie!</h2>
+                        <p>Wechsle zu einer anderen Kategorie oder schließe mehr Karten ab.</p>
+                    </div>
+                `;
+                document.getElementById('actionButtons').style.display = 'none';
+                return;
+            }
+            
+            showCard();
+        }
+        
+        function showCard() {
+            if (currentIndex >= cards.length) {
+                document.getElementById('cardContainer').innerHTML = `
+                    <div class="empty">
+                        <h2>🎉 Stapel abgeschlossen!</h2>
+                        <p>Du hast alle Karten in dieser Sitzung bearbeitet.</p>
+                        <button class="btn btn-show" onclick="loadCards()" style="margin-top: 1rem;">Nochmal</button>
+                    </div>
+                `;
+                document.getElementById('actionButtons').style.display = 'none';
+                return;
+            }
+            
+            const card = cards[currentIndex];
+            answerShown = false;
+            
+            document.getElementById('cardQuestion').textContent = card.question;
+            document.getElementById('cardAnswer').textContent = card.answer;
+            document.getElementById('cardAnswer').style.display = 'none';
+            document.getElementById('cardMeta').textContent = 
+                `📚 ${card.lecturer || 'N/A'} · ${card.theme || 'Allgemein'} · 📄 ${card.filename || 'N/A'}`;
+            document.getElementById('cardTags').innerHTML = 
+                `<span class="tag">${card.card_type}</span><span class="tag">${card.tags || 'Allgemein'}</span>`;
+            
+            document.getElementById('actionButtons').style.display = 'none';
+            document.querySelector('.buttons').style.display = 'flex';
+        }
+        
+        function showAnswer() {
+            document.getElementById('cardAnswer').style.display = 'block';
+            document.querySelector('.card .buttons').style.display = 'none';
+            document.getElementById('actionButtons').style.display = 'flex';
+            answerShown = true;
+        }
+        
+        async function markCard(correct) {
+            const card = cards[currentIndex];
+            await fetch(API + '/cards/' + card.id + '/progress', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({correct: correct})
+            });
+            
+            loadStats();
+            nextCard();
+        }
+        
+        function nextCard() {
+            currentIndex++;
+            showCard();
+        }
+        
+        function setFilter(status) {
+            currentFilter = status;
+            quizMode = false;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            loadCards();
+        }
+        
+        async function startQuiz() {
+            quizMode = true;
+            currentFilter = null;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            const res = await fetch(API + '/quiz?count=10');
+            cards = await res.json();
+            currentIndex = 0;
+            
+            // Shuffle answers for quiz mode
+            document.querySelector('.card').classList.add('quiz-mode');
+            showCard();
+        }
+        
+        // Init
+        loadStats();
+        loadCards();
+    </script>
+</body>
+</html>
