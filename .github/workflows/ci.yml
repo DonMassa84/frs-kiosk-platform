@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: Syntax-, Contract- und Struktur-Gate (ohne Abhängigkeiten)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Kompilierbarkeit
+        run: python -m compileall -q backend tests
+      - name: Gates
+        run: python -m unittest discover -s tests -v
+
+  tests:
+    name: Tests mit installierten Abhängigkeiten
+    runs-on: ubuntu-latest
+    needs: gate
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Abhängigkeiten
+        run: pip install -r requirements.txt
+      - name: Import-Smoke-Test (beide Apps)
+        run: |
+          python -c "import backend.api.main as m; print('main OK', len(m.app.routes))"
+          python -c "import backend.api.main_v2 as m; print('main_v2 OK', len(m.app.routes))"
+      - name: Tests
+        run: python -m unittest discover -s tests -v

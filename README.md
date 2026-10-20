@@ -83,3 +83,19 @@ See `deploy-i7.sh` for deployment to the i7 server.
 - `POST /api/kiosk/cards/{id}/progress` - Update card progress
 - `GET /api/kiosk/stats` - Learning statistics
 - `GET /api/kiosk/quiz` - Get random quiz cards
+
+## Tests und CI
+
+```bash
+python3 -m unittest discover -s tests -v     # alle Gates
+python3 -m compileall -q backend tests       # nur Kompilierbarkeit
+```
+
+| Test | Prüft | Braucht Abhängigkeiten |
+|---|---|---|
+| `tests/test_syntax.py` | jede `.py`-Datei ist kompilierbar | **nein** |
+| `tests/test_api_contract.py` | Routen vorhanden; **keine doppelten `(Methode, Pfad)`-Paare**; keine doppelten Funktionsnamen (AST, ohne Import) | **nein** |
+| `tests/test_structure.py` | Pflichtdateien vorhanden; `.gitignore` deckt Geheimnisse ab; Kernabhängigkeiten in `requirements.txt` | **nein** |
+
+`.github/workflows/ci.yml` hat zwei Jobs: `gate` (abhängigkeitsfrei, läuft immer) und `tests`
+(mit `pip install`, plus Import-Smoke-Test beider Apps `backend.api.main` und `backend.api.main_v2`).

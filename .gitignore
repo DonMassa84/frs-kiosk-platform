@@ -5,3 +5,18 @@ __pycache__/
 data/
 .venv/
 *.log
+
+# Geheimnisse (Nachtrag Welle 2, 2026-10-20)
+.env
+.env.*
+*.key
+*.pem
+secrets.yaml
+secrets.yml
+.secrets/
+*.sqlite
+*.sqlite3
+credentials.json
+config.json
+*.crt
+*.pfx
