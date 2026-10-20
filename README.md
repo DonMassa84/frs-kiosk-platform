@@ -44,8 +44,8 @@ Then open:
 ## Data Sources
 
 Integrates processed data from:
-- `/home/shadowmaker/Schreibtisch/kursmaterial-pruefung/` - Processed course materials
-- `/home/shadowmaker/ihk-video-inventur/` - Video inventory
+- `~/Schreibtisch/kursmaterial-pruefung/` - Processed course materials
+- `~/ihk-video-inventur/` - Video inventory
 - LLaVA vision analysis results (GPU)
 - Audio transcriptions (Whisper CPU)
 

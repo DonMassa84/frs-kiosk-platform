@@ -3,6 +3,7 @@
 Unified Course Database for FRS Archive & Kiosk Platform
 """
 
+import os
 import sqlite3
 import json
 import hashlib
@@ -18,8 +19,12 @@ logger = logging.getLogger(__name__)
 DB_PATH = Path.home() / "frs-kiosk-platform" / "data" / "course_platform.db"
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-COURSE_DATA = Path("/home/shadowmaker/Schreibtisch/kursmaterial-pruefung")
-VIDEO_INVENTORY = Path("/home/shadowmaker/ihk-video-inventur/ihk-video-intelligence")
+# Local data roots are configurable so the public source carries no user name.
+# Defaults reproduce the original layout on the author's machine.
+FRS_DATA_ROOT = Path(os.environ.get("FRS_DATA_ROOT", Path.home() / "Schreibtisch")).expanduser()
+COURSE_DATA = Path(os.environ.get("FRS_COURSE_DATA", FRS_DATA_ROOT / "kursmaterial-pruefung")).expanduser()
+VIDEO_INVENTORY = Path(os.environ.get("FRS_VIDEO_INVENTORY",
+                                     Path.home() / "ihk-video-inventur" / "ihk-video-intelligence")).expanduser()
 
 
 class CourseDatabase:

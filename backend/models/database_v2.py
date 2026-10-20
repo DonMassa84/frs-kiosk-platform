@@ -10,6 +10,7 @@ Improvements based on Mistral AI recommendations:
 - Batch operations with executemany
 """
 
+import os
 import aiosqlite
 import json
 import hashlib
@@ -25,7 +26,8 @@ logger = logging.getLogger(__name__)
 DB_PATH = Path.home() / "frs-kiosk-platform" / "data" / "course_platform_v2.db"
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-COURSE_DATA = Path("/home/shadowmaker/Schreibtisch/kursmaterial-pruefung")
+FRS_DATA_ROOT = Path(os.environ.get("FRS_DATA_ROOT", Path.home() / "Schreibtisch")).expanduser()
+COURSE_DATA = Path(os.environ.get("FRS_COURSE_DATA", FRS_DATA_ROOT / "kursmaterial-pruefung")).expanduser()
 
 # Leitner Box intervals (in days) - easy to implement, ready for FSRS migration
 LEITNER_INTERVALS = [1, 3, 7, 14, 30]  # Box 1-5 intervals
